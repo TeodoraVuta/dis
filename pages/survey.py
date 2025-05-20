@@ -11,7 +11,7 @@ load_dotenv()
 db_password = os.getenv("DB_PASSWORD")
 db_user = os.getenv("DB_USER")
 db_host = os.getenv("DB_HOST")
-db_port = os.getenv("DB_PORT")
+db_port = os.getenv("DB_PORT", 3306)
 
 st.set_page_config(page_title="survey", page_icon="📋", layout="centered")
 
