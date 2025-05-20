@@ -1,17 +1,27 @@
+from dotenv import load_dotenv
 import streamlit as st
 from country_list import countries_for_language
 import mysql.connector
+import os
+
+load_dotenv()
+
+
+db_password = os.getenv("DB_PASSWORD")
+db_user = os.getenv("DB_USER")
+db_host = os.getenv("DB_HOST")
+db_port = os.getenv("DB_PORT")
 
 st.set_page_config(page_title="survey", page_icon="📋", layout="centered")
 
 
 def get_connection():
     conn = mysql.connector.connect(
-        host="sql7.freesqldatabase.com",
-        user="sql7780105",
-        password="yEYfyc2HnJ",
-        database="sql7780105",
-        port=3306,
+        host=db_host,
+        user=db_user,
+        password=db_password,
+        database=db_user,
+        port=db_port,
     )
 
     cursor = conn.cursor()
