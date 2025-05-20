@@ -6,12 +6,11 @@ import os
 
 load_dotenv()
 
-
-
-db_password = os.getenv("DB_PASSWORD")
-db_user = os.getenv("DB_USER")
-db_host = os.getenv("DB_HOST")
-db_port = 3306
+db_host = st.secrets["DB_HOST"]
+db_user = st.secrets["DB_USER"]
+db_password = st.secrets["DB_PASSWORD"]
+db_name = st.secrets["DB_NAME"]
+db_port = int(st.secrets["DB_PORT"])
 
 st.set_page_config(page_title="survey", page_icon="📋", layout="centered")
 
