@@ -7,6 +7,7 @@ import os
 load_dotenv()
 
 
+
 db_password = os.getenv("DB_PASSWORD")
 db_user = os.getenv("DB_USER")
 db_host = os.getenv("DB_HOST")
