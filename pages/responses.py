@@ -3,6 +3,8 @@ from db_utils import get_connection, close_connection
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
+from country_list import countries_for_language
+
 
 st.title("📋 Răspunsuri colectate")
 
@@ -45,37 +47,58 @@ gender_standard = {
     "Prefer s? nu spun" : "Prefer să nu spun",
 }
 
+ro_countries = dict(countries_for_language('ro'))
+country_standard = {v: k for k, v in ro_countries.items()}
+country_standard["România"] = "Romania"  # Asigură-te că România este inclusă corect
+
+    
+
 df['educatie_standard'] = df['education'].replace(educatie_standard)
-
-education_counts = df['educatie_standard'].value_counts()
-education_options = ['Toate'] + list(df['educatie_standard'].dropna().unique())
-
-
 df['gender_standard'] = df['gender'].replace(gender_standard)
+df['country_standard'] = df['country'].replace(country_standard)
 
-gender_counts = df['gender_standard'].value_counts()
+# Construiește listele de opțiuni, incluzând "Toate"
+education_options = ['Toate'] + sorted(df['educatie_standard'].dropna().unique().tolist())
+gender_options = ['Toate'] + sorted(df['gender_standard'].dropna().unique().tolist())
+country_options = ['Toate'] + sorted(df['country_standard'].dropna().unique().tolist())
+
 
 if not df.empty:
-    col_filters, col_table = st.columns([1, 3])  
+    col_filters, col_table = st.columns([1, 3])
 
-    with col_filters:
-        selected_sex = st.selectbox("Selectează sexul:", options=df['gender_standard'].dropna().unique())
-        selected_education = st.selectbox("Selectează nivelul de educație:", options=df['educatie_standard'].dropna().unique())
+    with col_filters: 
+        selected_sex = st.multiselect("Selectează sexul:", options=gender_options, default=["Toate"])
+        selected_education = st.multiselect("Selectează nivelul de educație:", options=education_options, default=["Toate"])
+        selected_country = st.multiselect("Selectează țara:", options=country_options, default=["Toate"])
 
-    if selected_education == 'Toate':
-        filtered_df = df[df['gender_standard'] == selected_sex]
-    else:
-        filtered_df = df[
-            (df['gender_standard'] == selected_sex) &
-            (df['educatie_standard'] == selected_education)
-        ]
 
-    filtered_df = df[
-        (df['gender_standard'] == selected_sex) &
-        (df['educatie_standard'] == selected_education)
-    ]
+    # Funcție de filtrare care ține cont de "Toate" ca valoare specială
+    def filtreaza_date(df, sex_sel, educ_sel, country_sel):
+        if "Toate" in sex_sel:
+            filtru_sex = df.index == df.index  # True pentru toate rândurile
+        else:
+            filtru_sex = df['gender_standard'].isin(sex_sel)
+
+        if "Toate" in educ_sel:
+            filtru_educ = df.index == df.index
+        else:
+            filtru_educ = df['educatie_standard'].isin(educ_sel)
+        
+        if "Toate" in country_sel:
+            filtru_country = df.index == df.index
+        else:
+            filtru_country = df['country_standard'].isin(selected_country)
+
+        return df[filtru_sex & filtru_educ & filtru_country]
+
+    filtered_df = filtreaza_date(df, selected_sex, selected_education, selected_country)
 
     with col_table:
-        st.dataframe(filtered_df, use_container_width=True)
+        if not filtered_df.empty:
+            counts = filtered_df['educatie_standard'].value_counts()
+            st.bar_chart(counts)
+        else:
+            st.warning("Nu există date pentru selecția curentă.")
+
 else:
     st.warning("Nu există date disponibile pentru afișare.")
