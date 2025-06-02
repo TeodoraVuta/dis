@@ -63,42 +63,53 @@ gender_options = ['Toate'] + sorted(df['gender_standard'].dropna().unique().toli
 country_options = ['Toate'] + sorted(df['country_standard'].dropna().unique().tolist())
 
 
+data = st.radio(
+options=["Date demografice", "Despre e-learning"], label="Selectează tipul de date:")
+
+
 if not df.empty:
-    col_filters, col_table = st.columns([1, 3])
+    # col_filters, col_table = st.columns([1, 3])   
+    col_filters_sex, col_filters_education, col_filters_country = st.columns(3)
+    
+    if data == "Date demografice":
+        with col_filters_sex: 
+            selected_sex = st.multiselect("Selectează sexul:", options=gender_options, default=["Toate"])
+        with col_filters_education:
+            selected_education = st.multiselect("Selectează nivelul de educație:", options=education_options, default=["Toate"])
+        with col_filters_country:
+            selected_country = st.multiselect("Selectează țara:", options=country_options, default=["Toate"])
+    
+    # if data == "Despre e-learning":
 
-    with col_filters: 
-        selected_sex = st.multiselect("Selectează sexul:", options=gender_options, default=["Toate"])
-        selected_education = st.multiselect("Selectează nivelul de educație:", options=education_options, default=["Toate"])
-        selected_country = st.multiselect("Selectează țara:", options=country_options, default=["Toate"])
 
 
-    # Funcție de filtrare care ține cont de "Toate" ca valoare specială
-    def filtreaza_date(df, sex_sel, educ_sel, country_sel):
-        if "Toate" in sex_sel:
-            filtru_sex = df.index == df.index  # True pentru toate rândurile
-        else:
-            filtru_sex = df['gender_standard'].isin(sex_sel)
+        # Funcție de filtrare care ține cont de "Toate" ca valoare specială
+        def filtreaza_date(df, sex_sel, educ_sel, country_sel):
+            if "Toate" in sex_sel:
+                filtru_sex = df.index == df.index  # True pentru toate rândurile
+            else:
+                filtru_sex = df['gender_standard'].isin(sex_sel)
 
-        if "Toate" in educ_sel:
-            filtru_educ = df.index == df.index
-        else:
-            filtru_educ = df['educatie_standard'].isin(educ_sel)
-        
-        if "Toate" in country_sel:
-            filtru_country = df.index == df.index
-        else:
-            filtru_country = df['country_standard'].isin(selected_country)
+            if "Toate" in educ_sel:
+                filtru_educ = df.index == df.index
+            else:
+                filtru_educ = df['educatie_standard'].isin(educ_sel)
 
-        return df[filtru_sex & filtru_educ & filtru_country]
+            if "Toate" in country_sel:
+                filtru_country = df.index == df.index
+            else:
+                filtru_country = df['country_standard'].isin(selected_country)
 
-    filtered_df = filtreaza_date(df, selected_sex, selected_education, selected_country)
+            return df[filtru_sex & filtru_educ & filtru_country]
 
-    with col_table:
-        if not filtered_df.empty:
-            counts = filtered_df['educatie_standard'].value_counts()
-            st.bar_chart(counts)
-        else:
-            st.warning("Nu există date pentru selecția curentă.")
+        filtered_df = filtreaza_date(df, selected_sex, selected_education, selected_country)
+
+        # with col_table:
+        #     if not filtered_df.empty:
+        #         counts = filtered_df['educatie_standard'].value_counts()
+        #         st.bar_chart(counts)
+        #     else:
+        #         st.warning("Nu există date pentru selecția curentă.")
 
 else:
     st.warning("Nu există date disponibile pentru afișare.")
