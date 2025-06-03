@@ -81,9 +81,11 @@ if not df.empty:
     
     # if data == "Despre e-learning":
 
+    Button = st.button("Afișează datele filtrate")
+    if Button:
+        st.subheader("Date filtrate")
 
-
-        # Funcție de filtrare care ține cont de "Toate" ca valoare specială
+       # Funcție de filtrare care ține cont de "Toate" ca valoare specială
         def filtreaza_date(df, sex_sel, educ_sel, country_sel):
             if "Toate" in sex_sel:
                 filtru_sex = df.index == df.index  # True pentru toate rândurile
@@ -105,11 +107,11 @@ if not df.empty:
         filtered_df = filtreaza_date(df, selected_sex, selected_education, selected_country)
 
         # with col_table:
-        #     if not filtered_df.empty:
-        #         counts = filtered_df['educatie_standard'].value_counts()
-        #         st.bar_chart(counts)
-        #     else:
-        #         st.warning("Nu există date pentru selecția curentă.")
+        if not filtered_df.empty:
+                counts = filtered_df['educatie_standard'].value_counts()
+                st.bar_chart(counts)
+        else:
+                st.warning("Nu există date pentru selecția curentă.")
 
 else:
     st.warning("Nu există date disponibile pentru afișare.")
