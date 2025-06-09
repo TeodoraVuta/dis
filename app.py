@@ -1,11 +1,29 @@
 import streamlit as st
 from PIL import Image
 import base64
+from dotenv import load_dotenv
+import mysql.connector
+import bcrypt
+from streamlit_extras.switch_page_button import switch_page
+from db_utils import show_logged_in_user
+
+show_logged_in_user()
+
+load_dotenv()
+
+db_host = st.secrets["DB_HOST"]
+db_user = st.secrets["DB_USER"]
+db_password = st.secrets["DB_PASSWORD"]
+db_name = st.secrets["DB_USER"]
+db_port = int(st.secrets["DB_PORT"])
+
 
 def get_base64_video(path):
     with open(path, 'rb') as f:
         video_bytes = f.read()
     return base64.b64encode(video_bytes).decode()
+
+
 
 video2 = get_base64_video("resources/girlVideo.mp4")
 
@@ -16,8 +34,49 @@ video_gallery_html = f"""
     </video>
 </div>
 """
+def hash_password(password):
+    salt = bcrypt.gensalt()
+    hashed = bcrypt.hashpw(password.encode('utf-8'), salt)
+    return hashed
 
-# Inject CSS for full-page animated gradient background
+# def check_password(password, hashed):
+#     return bcrypt.checkpw(password.encode('utf-8'), hashed.encode('utf-8'))
+
+def check_credentials(username, password, conn):
+    try:
+        conn = mysql.connector.connect(
+            host=db_host,
+            user=db_user,
+            password=db_password,
+            database=db_name,
+            port=db_port
+        )
+        cursor = conn.cursor()
+
+        query = "SELECT password FROM login WHERE username = %s"
+        cursor.execute(query, (username,))
+        result = cursor.fetchone()
+
+        cursor.close()
+        conn.close()
+
+        if result:
+            stored_hash = result[0]
+            return check_password(password, stored_hash)
+        else:
+            return False
+
+    except mysql.connector.Error as err:
+        st.error(f"Eroare la conectarea la baza de date: {err}")
+        return False
+
+def check_password(password, hashed):
+    try:
+        return bcrypt.checkpw(password.encode('utf-8'), hashed.encode('utf-8'))
+    except Exception as e:
+        st.error(f"Eroare la verificarea parolei: {e}")
+        return False
+
 st.markdown(
     """
     <style>
@@ -65,9 +124,7 @@ def remove_white_background(img):
 
     newData = []
     for item in datas:
-        # Schimbă pragul după cum trebuie, aici e un exemplu
         if item[0] > 200 and item[1] > 200 and item[2] > 200:
-            # devine transparent
             newData.append((255, 255, 255, 0))
         else:
             newData.append(item)
@@ -130,20 +187,44 @@ st.markdown(
 )
 
 with col1:
-    with st.form(key='logIn'):
-        st.text_input("Username")
-        st.text_input("Password", type="password")
-        c1, c2 = st.columns(2)
-        with c1:
-            submit_button = st.form_submit_button(label='Log In')
-        with c2:
-            submit_button = st.form_submit_button(label='Forgot Password')
+    st.subheader("Autentificare")
 
+    with st.form(key='logIn'):
+        username = st.text_input("Username")
+        password = st.text_input("Password", type="password")
+        submit_button = st.form_submit_button(label='Log In')
+
+        if submit_button:
+            try:
+                conn = mysql.connector.connect(
+                    host=db_host,
+                    user=db_user,
+                    password=db_password,
+                    database=db_name,
+                    port=db_port
+                )
+
+                if check_credentials(username, password, conn):
+                    st.success("Autentificare reușită! Bine ai revenit, " + username)
+                    st.session_state['logged_in'] = True
+                    st.session_state['username'] = username
+                    switch_page("user")  
+
+                else:
+                    st.error("Nume de utilizator sau parolă incorecte.")
+                
+                conn.close()
+
+            except mysql.connector.Error as err:
+                st.error(f"Eroare de conectare la baza de date: {err}")
+
+    
 st.title("Nu ai inca un cont? Inregistreaza-te aici!")
 
 with st.expander("Cont nou - Înregistrează-te aici"):
     with st.form(key='signUp'):
         st.write("Completează câmpurile de mai jos pentru a crea un cont nou:")
+        email = st.text_input("Email", placeholder="Introdu adresa ta de email")
         username = st.text_input("Nume utilizator nou", placeholder="Introdu un nume de utilizator")
         password = st.text_input("Parolă nouă", type="password", placeholder="Alege o parolă sigură")
         confirm_password = st.text_input("Confirmă parola", type="password", placeholder="Reintrodu parola")
@@ -155,9 +236,49 @@ with st.expander("Cont nou - Înregistrează-te aici"):
                 st.error("Te rog completează toate câmpurile.")
             elif password != confirm_password:
                 st.error("Parolele nu coincid. Încearcă din nou.")
+            elif len(password) < 8:
+                st.error("Parola trebuie să aibă cel puțin 8 caractere.")
+            elif not any(char.isdigit() for char in password):
+                st.error("Parola trebuie să conțină cel puțin un caracter numeric.")
+            elif not any(char.isalpha() for char in password):
+                st.error("Parola trebuie să conțină cel puțin o literă.")
+            elif not any(char in "!@#$%^&*()-_=+[]{}|;:',.<>?/" for char in password):
+                st.error("Parola trebuie să conțină cel puțin un caracter special.")
+            elif any(password[i] == password[i+1] == password[i+2] for i in range(len(password) - 2)):
+                st.error("Parola nu poate conține același caracter repetat de 3 ori consecutiv.")
+            elif len(username) < 3 or len(username) > 20:
+                st.error("Numele de utilizator trebuie să aibă între 3 și 20 de caractere.")
+            elif not email or '@' not in email or '.' not in email.split('@')[-1]:
+                st.error("Te rog introdu o adresă de email validă.")
             else:
-                # Aici poți pune logica de creare cont
+                try:
+                    conn = mysql.connector.connect(
+                        host=db_host,
+                        user=db_user,
+                        password=db_password,
+                        database=db_user,
+                        port=db_port,
+                    )
+                    cursor = conn.cursor()
+
+                    cursor.execute("SELECT * FROM login WHERE username = %s", (username,))
+                    if cursor.fetchone():
+                        st.error("Acest nume de utilizator este deja folosit. Alege altul.")
+                    cursor.execute("SELECT * FROM login WHERE email = %s", (email,))
+                    if cursor.fetchone():
+                        st.error("Acest email este deja folosit. Te rog folosește altul.")
+                    else:
+                        hashed_password = hash_password(password)
+                        cursor.execute("INSERT INTO login (email, username, password) VALUES (%s, %s, %s)", (email, username, hashed_password))
+                        conn.commit()
+                except mysql.connector.Error as err:
+                    st.error(f"Eroare la crearea contului: {err}")
+                finally:
+                    cursor.close()
+                    conn.close()
                 st.success(f"Cont creat cu succes pentru utilizatorul '{username}'!")
+
+
 
 
 
@@ -247,5 +368,4 @@ reviews_html = """
 """
 
 st.markdown(reviews_html, unsafe_allow_html=True)
-
 

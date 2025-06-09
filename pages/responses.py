@@ -4,6 +4,9 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 from country_list import countries_for_language
+from db_utils import show_logged_in_user
+
+show_logged_in_user()
 
 
 st.title("📋 Răspunsuri colectate")
