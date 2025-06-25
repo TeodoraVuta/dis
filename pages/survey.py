@@ -136,8 +136,8 @@ for key, default_value in keys_to_initialize:
 
 
 total_pages = 5
-current_page = st.session_state.page
-progress = int((current_page / total_pages) * 100)
+current_page_survey = st.session_state.page
+progress = int((current_page_survey / total_pages) * 100)
 st.progress(progress)
 
 
