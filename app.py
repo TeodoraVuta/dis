@@ -281,78 +281,32 @@ with st.expander("Cont nou - Înregistrează-te aici"):
                     conn.close()
                 st.success(f"Cont creat cu succes pentru utilizatorul '{username}'!")
 
-
 reviews = get_feedbacks()
 
-# CSS injectat
-st.markdown("""
-<style>
-.block-container {
-    padding-left: 0rem !important;
-    padding-right: 0rem !important;
-}
-.full-width-section {
-    width: 100vw;
-    margin-left: calc(-50vw + 50%);
-    padding: 30px 50px;
-    background: #ffffffdd;
-    box-sizing: border-box;
-}
-.reviews-row {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: space-evenly;
-    gap: 20px;
-}
-.review-card {
-    flex: 1 1 250px;
-    max-width: 300px;
-    background: #f0f4f8;
-    border-radius: 10px;
-    padding: 15px 15px 15px 60px;
-    position: relative;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-    font-family: 'Segoe UI', sans-serif;
-    color: #34495e;
-}
-.review-img {
-    position: absolute;
-    top: 15px;
-    left: 15px;
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
-    object-fit: cover;
-    box-shadow: 0 0 5px rgba(0,0,0,0.1);
-}
-.review-username {
-    font-weight: bold;
-    margin-bottom: 8px;
-}
-.color1 { background: #d6e9f8; }
-.color2 { background: #f8e3e1; }
-.color3 { background: #e8f9e8; }
-.color4 { background: #fff4d1; }
-.color5 { background: #d9e6f2; }
-</style>
-""", unsafe_allow_html=True)
+if not reviews:
+    st.info("No feedbacks found.")
+    st.stop()
 
-colors = ["color1", "color2", "color3", "color4", "color5"]
-review_html = '<div class="full-width-section"><div class="reviews-row">'
+st.subheader("📋 Cele mai recente feeback uri")
 
-for i, (username, text) in enumerate(reviews):
-    img = f"https://api.dicebear.com/9.x/initials/svg?seed={username}"
-    color = colors[i % len(colors)]
-    review_html += f"""
-    <div class="review-card {color}">
-        <img class="review-img" src="{img}" alt="{username}">
-        <div class="review-username">{username}</div>
-        <div>{text}</div>
-    </div>
-    """
+# Create 5 columns
+cols = st.columns(5)
 
-review_html += "</div></div>"
+for col, (username, text) in zip(cols * 2, [tuple(r) for r in reviews]):
+    with col:
+        # Create avatar + name row
+        with st.container():
+            avatar_col, name_col = st.columns([1, 3])
+            with avatar_col:
+                st.markdown(
+                    f"""
+                    <img src="https://api.dicebear.com/9.x/initials/svg?seed={username}"
+                         style="width:45px; height:45px; border-radius:50%;">
+                    """,
+                    unsafe_allow_html=True
+                )
+            with name_col:
+                st.markdown(f"**{username}**")
 
-# Afișare
-# st.markdown(review_html, unsafe_allow_html=True)
-st.markdown(f"html\n{review_html}\n", unsafe_allow_html=True)
+        # Show review text
+        st.markdown(text)

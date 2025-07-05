@@ -185,113 +185,88 @@ elearning_data = st.checkbox("Despre e-learning", value=False)
 
 def handle_multiselect(label, key, options):
     current = st.session_state.get(key, [])
+    disabled_opts = [opt != "Toate" and "Toate" in current for opt in options]
+    
+    new_selection = st.multiselect(label, options=options, default=current, key=key, disabled=disabled_opts)
 
-    if "Toate" in current and len(current) > 1:
-        st.warning("Pentru a selecta opțiuni individuale, elimină 'Toate'.")
-        # Nu modificăm direct session_state[key], ci folosim callback
-        st.experimental_rerun()
-
-    # opțiuni „dezactivate vizual” dacă e selectat „Toate”
-    fake_options = (
-        ["Toate"] + [f"{opt} (dezactivat)" for opt in options if opt != "Toate"]
-        if "Toate" in current else options
-    )
-
-    # selectăm doar ce e valid
-    default_selection = [opt for opt in current if opt in options]
-
-    new_selection = st.multiselect(
-        label=label,
-        options=fake_options,
-        default=default_selection,
-        key=key,
-        placeholder="Selectează..."
-    )
-
-    # curățăm selecția de opțiuni „dezactivate” simulate
-    clean_selection = [opt for opt in new_selection if not opt.endswith("(dezactivat)")]
-
-    # salvăm indirect, cu workaround (fără să atingem direct session_state[key])
-    if clean_selection != current:
-        st.session_state.update({key: clean_selection})
-        st.experimental_rerun()
-
+    if "Toate" in new_selection and len(new_selection) > 1:
+        st.session_state[key] = ["Toate"]
+        st.rerun()
 
 def filtreaza_date_demografics(df, sex_sel, educ_sel, country_sel, age_range=None):
-    if "Toate" in sex_sel:
-        filtru_sex = df.index == df.index
-    else:
-        filtru_sex = df['gender_standard'].isin(sex_sel)
-    if "Toate" in educ_sel:
-        filtru_educ = df.index == df.index
-    else:
-        filtru_educ = df['educatie_standard'].isin(educ_sel)
-    if "Toate" in country_sel:
-        filtru_country = df.index == df.index
-    else:
-        filtru_country = df['country_standard'].isin(country_sel)
-    
-    if age_range is not None:
-        filtru_age = df['age'].between(age_range[0], age_range[1])
-    else:
-        filtru_age = df.index == df.index
-    return df[filtru_sex & filtru_educ & filtru_country & filtru_age]
+        if "Toate" in sex_sel:
+            filtru_sex = df.index == df.index
+        else:
+            filtru_sex = df['gender_standard'].isin(sex_sel)
+
+        if "Toate" in educ_sel:
+            filtru_educ = df.index == df.index
+        else:
+            filtru_educ = df['educatie_standard'].isin(educ_sel)
+
+        if "Toate" in country_sel:
+            filtru_country = df.index == df.index
+        else:
+            filtru_country = df['country_standard'].isin(country_sel)
+        
+        if age_range is not None:
+            filtru_age = df['age'].between(age_range[0], age_range[1])
+        else:
+            filtru_age = df.index == df.index
+
+        return df[filtru_sex & filtru_educ & filtru_country & filtru_age]
 
 
 def filtreaza_date_elearning(df, platform_sel, courses_sel, reasons_sel):
     if "Toate" in platform_sel:
-        filtru_platform = df.index == df.index
+        filtru_platform = pd.Series(True, index=df.index)
     else:
-        filtru_platform = df['platform_standard'].isin(platform_sel)
+        filtru_platform = df['platform_standard'].apply(lambda x: any(p in x for p in platform_sel))
 
     if "Toate" in courses_sel:
-        filtru_courses = df.index == df.index
+        filtru_courses = pd.Series(True, index=df.index)
     else:
-        filtru_courses = df['courses_standard'].isin(courses_sel)
+        filtru_courses = df['courses_standard'].apply(lambda x: any(c in x for c in courses_sel))
 
     if "Toate" in reasons_sel:
-        filtru_reasons = df.index == df.index
+        filtru_reasons = pd.Series(True, index=df.index)
     else:
-        filtru_reasons = df['reasons_standard'].isin(reasons_sel)
+        filtru_reasons = df['reasons_standard'].apply(lambda x: any(r in x for r in reasons_sel))
 
     return df[filtru_platform & filtru_courses & filtru_reasons]
 
 if not df.empty:
+    # col_filters, col_table = st.columns([1, 3])   
+    
+    
     if demografics_data:
         col_filters_sex, col_filters_education, col_filters_country = st.columns(3)
-
-        with col_filters_sex:
-            handle_multiselect("Genul:", "selected_sex", gender_options)
+        with col_filters_sex: 
+            selected_sex = st.multiselect("Genul:", options=gender_options, default=["Toate"])
         with col_filters_education:
-            handle_multiselect("Nivelul de educație:", "selected_education", education_options)
+            selected_education = st.multiselect("Nivelul de educație:", options=education_options, default=["Toate"])
         with col_filters_country:
-            handle_multiselect("țara:", "selected_country", country_options)
+            selected_country = st.multiselect("țara:", options=country_options, default=["Toate"])
 
-        selected_sex = st.session_state["selected_sex"]
-        selected_education = st.session_state["selected_education"]
-        selected_country = st.session_state["selected_country"]
     else:
         selected_sex = ["Toate"]
         selected_education = ["Toate"]
         selected_country = ["Toate"]
 
     if elearning_data:
-        col_filters_platform, col_filters_courses, col_filters_reasons= st.columns(3)
+        col_filters_platform, col_filters_courses, col_filters_reasons, col_filters_others = st.columns(4)
         with col_filters_platform:
-            handle_multiselect("Platforma de e-learning:", "selected_platform", platform_options)
+            selected_platform = st.multiselect("platforma de e-learning:", options=platform_options, default=["Toate"])
         with col_filters_courses:
-            handle_multiselect("Tipul cursurilor:", "selected_courses", course_options)
+            selected_courses = st.multiselect("Tipul cursurilor:", options=course_options, default=["Toate"])
         with col_filters_reasons:
-            handle_multiselect("Motivele pentru e-learning:", "selected_reasons", reasons_options)
-
-        selected_platform = st.session_state["selected_platform"]
-        selected_courses = st.session_state["selected_courses"]
-        selected_reasons = st.session_state["selected_reasons"]
+            selected_reasons = st.multiselect("motivele pentru e-learning:", options=reasons_options, default=["Toate"])
+        with col_filters_others:
+            pass
     else:
         selected_platform = ["Toate"]
         selected_courses = ["Toate"]
         selected_reasons = ["Toate"]
-
 
 Button = st.button("Afișează datele filtrate")
 if Button:
