@@ -58,13 +58,13 @@ def get_answers_for_question(question_id):
     conn.close()
     return answers
 
-def insert_answer(user_id, question_id, answer_text):
+def insert_answer(question_id, user_id, answer_text, created_at):
     conn = get_conn()
     cursor = conn.cursor()
     cursor.execute("""
-        INSERT INTO answers (user_id, question_id, answer_text, created_at)
+        INSERT INTO answers (question_id, user_id, answer_text, created_at)
         VALUES (%s, %s, %s, NOW())
-    """, (user_id, question_id, answer_text))
+    """, (question_id, user_id, answer_text, created_at))
     conn.commit()
     cursor.close()
     conn.close()
@@ -76,6 +76,34 @@ def deactivate_question(question_id):
     conn.commit()
     cursor.close()
     conn.close()
+
+def insert_feedback(user_id, feedback):
+    conn = get_conn()
+    cursor = conn.cursor()
+    cursor.execute("""
+        INSERT INTO feedback (user_id, feedback)
+        VALUES (%s, %s)
+    """, (user_id, feedback))
+    conn.commit()
+    cursor.close()
+    conn.close()
+
+def create_feedback():
+    st.subheader("Adaugă un feedback despre această aplicație")
+    feedback = st.text_area("Aici:")
+    if st.button("Trimite feedback"):
+        if feedback.strip() != "":
+            if "username" in st.session_state:
+                user_id = get_user_id_by_username(st.session_state["username"])
+                if user_id:
+                    insert_feedback(user_id, feedback.strip())
+                    st.success("Mulțumim pentru feedback!")
+                else:
+                    st.error("Utilizatorul nu a fost găsit.")
+            else:
+                st.warning("Trebuie să fii autentificat pentru a trimite feedback.")
+        else:
+            st.warning("Te rugăm să completezi feedback-ul înainte de a trimite.")
 
 # Verifică dacă utilizatorul e logat
 if not username:
@@ -115,6 +143,11 @@ if st.session_state.page == "select_topic":
             topic_id = get_or_create_topic(new_topic.strip())
             st.success(f"✅ Subiectul „{new_topic}” a fost adăugat!")
             st.rerun()
+    
+    create_feedback()
+
+
+    
 
 # Pagina întrebărilor pentru un subiect
 elif st.session_state.page == "topic_questions":
@@ -174,3 +207,6 @@ elif st.session_state.page == "topic_questions":
     if st.button("⬅️ Înapoi la selecția subiectului"):
         st.session_state.page = "select_topic"
         st.rerun()
+
+    create_feedback()
+
