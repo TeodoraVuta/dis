@@ -68,7 +68,7 @@ platform_standard = {
 }
 
 couses_standard = {
-    "Tehnic (Programare, Data Science)" : "Tehnic (Programare, Data Science)",
+        "Tehnic (Programare, Data Science)" : "Tehnic (Programare, Data Science)",
         "Business & Management" : "Business & Management", 
         "Finanțe & Economie" : "Finanțe & Economie",
         "Lingvistică & Limbi Străine": "Lingvistică & Limbi Străine", 
@@ -160,15 +160,70 @@ for eng_name, iso_code in english_to_iso.items():
 for iso_code, ro_name in iso_to_ro.items():
     country_standard[iso_code] = ro_name
 
-df['country_standard'] = df['country'].replace(country_standard)
-    
 
-df['educatie_standard'] = df['education'].replace(educatie_standard)
-df['gender_standard'] = df['gender'].replace(gender_standard)
-df['country_standard'] = df['country'].replace(country_standard)
-df['platform_standard'] = df['selected_platforms'].replace(platform_standard).str.split(',').apply(lambda lst: [x.strip() for x in lst] if isinstance(lst, list) else [])
-df['course_standard'] = df['selected_courses'].replace(couses_standard).str.split(',').apply(lambda lst: [x.strip() for x in lst] if isinstance(lst, list) else [])
-df['reasons_standard'] = df['selected_usage'].replace(reasons_standard).str.split(',').apply(lambda lst: [x.strip() for x in lst] if isinstance(lst, list) else [])
+def fix_platforms(text):
+    if pd.isna(text):
+        return text
+    return (text
+        .replace("Platforma de la facultate/scoala (Moodle)", "Platforma de la facultate/scoala")
+        .replace("Platforma de la facultate/scoala", "Platforma de la facultate/scoala")
+        .replace("My university's platform", "Platforma de la facultate/scoala")
+        .replace("google", "Google")
+        # .replace("Altele", "Altele")
+        # .replace("Others", "Altele")
+    )
+
+def fix_courses(text):
+    if pd.isna(text):
+        return text
+    return (text
+        .replace("Technical (Programming, Data Science)", "Tehnic (Programare & Data Science)")
+        .replace("Tehnic (Programare, Data Science)", "Tehnic (Programare & Data Science)")
+        # .replace("Tehnic (Programare", "Tehnic (Programare & Data Science)")
+        # .replace("Tehnic (Programare & Tehnic (Programare", "Tehnic (Programare & Data Science)")
+        # .replace("Data Science)", "Tehnic (Programare & Data Science)")
+        .replace("Business & Management", "Business & Management")
+        .replace("Finance & Economics", "Finanțe & Economie")
+        .replace("Finan?e & Economie", "Finanțe & Economie")
+        .replace("Linguistics & Foreign Languages", "Lingvistică & Limbi Străine")
+        .replace("Lingvistic? & Limbi Str?ine", "Lingvistică & Limbi Străine")
+        .replace("Psychology & Human Behavior", "Psihologie & Comportament Uman")
+        .replace("Emerging Technologies (AI, Blockchain, etc.)", "Tehnologii Emergente")
+        .replace("Tehnologii Emergente (AI", "Tehnologii Emergente")
+        .replace("Blockchain", "Tehnologii Emergente")
+        .replace("etc.)", "Tehnologii Emergente")
+        .replace("Environment & Sustainability", "Mediu & Sustenabilitate")
+        .replace("Design & Graphics", "Design & Grafică")
+        .replace("Design & Grafic?", "Design & Grafică")
+        .replace("Travel & Tourism", "Călătorii & Turism")
+        .replace("C?l?torii & Turism", "Călătorii & Turism")
+        .replace("Entrepreneurship", "Antreprenoriat")
+        .replace("Personal Development", "Dezvoltare Personală")
+        .replace("Dezvoltare Personal?", "Dezvoltare Personală")
+        .replace("Arts & Humanities", "Artă & Științe Umaniste")
+        .replace("Art? & ?tiin?e Umaniste", "Artă & Științe Umaniste")
+        .replace("Health & Medicine", "Sănătate & Medicină")
+        .replace("Săn?tate & Medicin?", "Sănătate & Medicină")
+        .replace("S?n?tate & Medicin?", "Sănătate & Medicină")
+        .replace("Îngrijirea copilului ?i via?a de familie", "Îngrijirea copilului și viața de familie")
+        .replace("Sports Activities", "Activități Sportive")
+        .replace("Activit??i Sportive", "Activități Sportive")
+        .replace("Childcare & Family Life", "Îngrijirea copilului și viața de familie")
+        .replace("?ngrijirea copilului ?i via?a de familie", "Îngrijirea copilului și viața de familie")
+    )
+
+df['country_standard'] = df['country'].replace(country_standard).str.upper().dropna()
+df['educatie_standard'] = df['education'].replace(educatie_standard).str.upper().dropna()
+df['gender_standard'] = df['gender'].replace(gender_standard).str.upper().dropna()
+
+df['platform_standard'] = df['selected_platforms'].apply(fix_platforms).str.upper().str.split(',').apply(
+    lambda lst: [x.strip() for x in lst if x.strip()] if isinstance(lst, list) else [])
+
+df['course_standard'] = df['selected_courses'].apply(fix_courses).str.upper().str.split(',').apply(
+    lambda lst: [x.strip() for x in lst if x.strip()] if isinstance(lst, list) else [])
+
+df['reasons_standard'] = df['selected_usage'].replace(reasons_standard).str.upper().str.split(',').apply(
+    lambda lst: [x.strip() for x in lst if x.strip()] if isinstance(lst, list) else [])
 
 education_options = ['Toate'] + sorted(df['educatie_standard'].dropna().unique().tolist())
 gender_options = ['Toate'] + sorted(df['gender_standard'].dropna().unique().tolist())
@@ -292,99 +347,159 @@ if not df.empty:
         selected_courses = ["Toate"]
         selected_reasons = ["Toate"]
 
+def afiseaza_date_demografice(filtered_df):
+    st.markdown("### 📊 Date demografice")
 
-Button = st.button("Afișează datele filtrate")
-if Button:
+    st.write("#### Distribuția pe genuri")
+    gender_counts = filtered_df['gender_standard'].value_counts()
+    st.bar_chart(gender_counts)
+
+    st.write("#### Distribuția pe nivel de educație")
+    education_counts = filtered_df['educatie_standard'].value_counts()
+    st.bar_chart(education_counts)
+
+    st.write("#### Distribuția pe țări")
+    country_counts = filtered_df['country_standard'].value_counts().head(10)
+    st.bar_chart(country_counts)
+
+    st.write("#### Distribuția pe vârste")
+    fig_age = px.histogram(
+        filtered_df, x='age', nbins=20,
+        labels={'age': 'Vârstă', 'count': 'Număr respondenți'},
+    )
+    st.plotly_chart(fig_age, use_container_width=True)
+
+
+def afiseaza_date_elearning(filtered_df):
+    st.markdown("### 💻 Date despre e-learning")
+
+    # Platforme
+    st.write("#### Platforme folosite")
+    df_platforms = filtered_df.explode('platform_standard')
+    platform_counts = df_platforms['platform_standard'].value_counts()
+    st.bar_chart(platform_counts)
+
+    # Cursuri grupate pe sexe
+    st.write("#### Tipuri de cursuri urmate (distribuție pe sexe)")
+    df_courses = filtered_df.explode('course_standard')
+    df_courses = df_courses.dropna(subset=['course_standard', 'gender_standard']).copy()
+    df_courses = df_courses[df_courses['course_standard'] != '']
+
+    course_sex_counts = df_courses.groupby(['course_standard', 'gender_standard']).size().reset_index(name='count')
+    top_courses = df_courses['course_standard'].value_counts().index.tolist()
+    course_sex_counts = course_sex_counts[course_sex_counts['course_standard'].isin(top_courses)]
+
+    fig_courses = px.bar(
+        course_sex_counts,
+        x='course_standard',
+        y='count',
+        color='gender_standard',
+        barmode='group',
+        labels={'course_standard': 'Tip curs', 'count': 'Număr respondenți'},
+        title='Cursuri urmarite în funcție de gen'
+    )
+    fig_courses.update_layout(xaxis_title='Tip curs', yaxis_title='Număr respondenți', xaxis_tickangle=45)
+    st.plotly_chart(fig_courses, use_container_width=True)
+
+    # Motive
+    st.write("#### Motive pentru care folosesc e-learning")
+    df_reasons = filtered_df.explode('reasons_standard')
+    reason_counts = df_reasons['reasons_standard'].value_counts().head(10)
+    st.bar_chart(reason_counts)
+
+
+def filtreaza_toate_datele(df, sex_sel, educ_sel, country_sel, platform_sel, courses_sel, reasons_sel, age_range=None):
+    df_filtered = df.copy()
+
+    # Filtre demografice
+    if "Toate" not in sex_sel:
+        df_filtered = df_filtered[df_filtered['gender_standard'].isin(sex_sel)]
+    if "Toate" not in educ_sel:
+        df_filtered = df_filtered[df_filtered['educatie_standard'].isin(educ_sel)]
+    if "Toate" not in country_sel:
+        df_filtered = df_filtered[df_filtered['country_standard'].isin(country_sel)]
+    if age_range is not None:
+        df_filtered = df_filtered[df_filtered['age'].between(age_range[0], age_range[1])]
+
+    # Filtrare e-learning
+    if "Toate" not in platform_sel:
+        df_filtered = df_filtered[df_filtered['platform_standard'].apply(lambda lst: any(x in lst for x in platform_sel))]
+    if "Toate" not in courses_sel:
+        df_filtered = df_filtered[df_filtered['course_standard'].apply(lambda lst: any(x in lst for x in courses_sel))]
+    if "Toate" not in reasons_sel:
+        df_filtered = df_filtered[df_filtered['reasons_standard'].apply(lambda lst: any(x in lst for x in reasons_sel))]
+
+    return df_filtered
+
+
+def afiseaza_date_demografice(df):
+    st.markdown("### 📊 Date demografice")
+
+    st.write("#### Distribuția pe genuri")
+    st.bar_chart(df['gender_standard'].value_counts())
+
+    st.write("#### Distribuția pe nivel de educație")
+    st.bar_chart(df['educatie_standard'].value_counts())
+
+    st.write("#### Distribuția pe țări")
+    st.bar_chart(df['country_standard'].value_counts().head(10))
+
+    st.write("#### Distribuția pe vârste")
+    fig = px.histogram(df, x='age', nbins=20, labels={'age': 'Vârstă'})
+    st.plotly_chart(fig, use_container_width=True)
+
+
+def afiseaza_date_elearning(df):
+    st.markdown("### 💻 Date despre e-learning")
+
+    # Platforme
+    st.write("#### Platforme folosite")
+    st.bar_chart(pd.Series([item for sublist in df['platform_standard'] for item in sublist]).value_counts())
+
+    # Cursuri pe gen
+    st.write("#### Tipuri de cursuri urmate (distribuție pe sexe)")
+    exploded = df.explode('course_standard')
+    exploded = exploded.dropna(subset=['course_standard', 'gender_standard'])
+    counts = exploded.groupby(['course_standard', 'gender_standard']).size().reset_index(name='count')
+    top_courses = exploded['course_standard'].value_counts().head(10).index
+    counts = counts[counts['course_standard'].isin(top_courses)]
+
+    fig = px.bar(counts, x='course_standard', y='count', color='gender_standard', barmode='group')
+    fig.update_layout(xaxis_tickangle=45)
+    st.plotly_chart(fig, use_container_width=True)
+
+    # Motive
+    st.write("#### Motive pentru care folosesc e-learning")
+    st.bar_chart(pd.Series([item for sublist in df['reasons_standard'] for item in sublist]).value_counts().head(10))
+
+
+# 🔘 Interfață de rulare
+if st.button("Afișează datele filtrate"):
     st.subheader("Date filtrate")
 
-    filtered_df = filtreaza_date_demografics(df, selected_sex, selected_education, selected_country)
+    # fallback dacă nu e selectat nimic
+    selected_sex = selected_sex or ["Toate"]
+    selected_education = selected_education or ["Toate"]
+    selected_country = selected_country or ["Toate"]
+    selected_platform = selected_platform or ["Toate"]
+    selected_courses = selected_courses or ["Toate"]
+    selected_reasons = selected_reasons or ["Toate"]
 
-    filtered_df_1 = filtreaza_date_elearning(filtered_df, selected_platform, selected_courses, selected_reasons)
+    df_filtrat = filtreaza_toate_datele(
+        df,
+        selected_sex,
+        selected_education,
+        selected_country,
+        selected_platform,
+        selected_courses,
+        selected_reasons,
+        # age_range = (min, max) dacă vrei și slider pe vârstă
+    )
 
-    if not filtered_df.empty:
-
+    if not df_filtrat.empty:
         if demografics_data:
-            st.markdown("### 📊 Date demografice")
-
-            # Gen
-            st.write("#### Distribuția pe genuri")
-            gender_counts = filtered_df['gender_standard'].value_counts()
-            st.bar_chart(gender_counts)
-
-            # Educație
-            st.write("#### Distribuția pe nivel de educație")
-            education_counts = filtered_df['educatie_standard'].value_counts()
-            st.bar_chart(education_counts)
-
-            # Țară
-            st.write("#### Distribuția pe țări")
-            country_counts = filtered_df['country_standard'].value_counts().head(10)
-            st.bar_chart(country_counts)
-
-            st.write("#### Distribuția pe vârste")
-            fig_age = px.histogram(
-                    filtered_df, x='age', nbins=20,
-                    labels={'age': 'Vârstă', 'count': 'Număr respondenți'},
-                    # title='Distribuția vârstelor în funcție de filtre'
-                )
-            st.plotly_chart(fig_age, use_container_width=True)
-
-
-        # if elearning_data and not filtered_df_1.empty:
-        #     st.markdown("### 💻 Date despre e-learning")
-
-        #     # Platforme
-        #     st.write("#### Platforme folosite")
-        #     platform_counts = filtered_df_1['platform_standard'].explode().value_counts()
-        #     st.bar_chart(platform_counts)
-
-        #     # Cursuri
-        #     st.write("#### Tipuri de cursuri urmate")
-        #     course_counts = filtered_df_1['course_standard'].explode().value_counts().head(10)
-        #     st.bar_chart(course_counts)
-
-        #     # Motive
-        #     st.write("#### Motive pentru care folosesc e-learning")
-        #     reason_counts = filtered_df_1['reasons_standard'].explode().value_counts().head(10)
-        #     st.bar_chart(reason_counts)
-
-        if elearning_data and not filtered_df_1.empty:
-            st.markdown("### 💻 Date despre e-learning")
-
-            # Platforme
-            st.write("#### Platforme folosite")
-            platform_counts = filtered_df_1['platform_standard'].explode().value_counts()
-            st.bar_chart(platform_counts)
-
-            # Cursuri - bar chart grupat pe sexe
-            st.write("#### Tipuri de cursuri urmate (distribuție pe sexe)")
-            df_courses = filtered_df_1.explode('course_standard')
-            df_courses = df_courses.dropna(subset=['course_standard', 'gender_standard']).copy()
-            df_courses = df_courses[df_courses['course_standard'] != '']
-
-            course_sex_counts = df_courses.groupby(['course_standard', 'gender_standard']).size().reset_index(name='count')
-            top_courses = df_courses['course_standard'].value_counts().index.tolist()
-            course_sex_counts = course_sex_counts[course_sex_counts['course_standard'].isin(top_courses)]
-
-            fig_courses = px.bar(
-                course_sex_counts,
-                x='course_standard',
-                y='count',
-                color='gender_standard',
-                barmode='group',
-                labels={'course_standard': 'Tip curs', 'count': 'Număr respondenți'},
-                title='Cursuri urmarite pentru nivelul de educatie: Master'
-            )
-            fig_courses.update_layout(xaxis_title='Tip curs', yaxis_title='Număr respondenți', xaxis_tickangle=45)
-            st.plotly_chart(fig_courses, use_container_width=True)
-
-            # Motive
-            st.write("#### Motive pentru care folosesc e-learning")
-            reason_counts = filtered_df_1['reasons_standard'].explode().value_counts().head(10)
-            st.bar_chart(reason_counts)
-
-
+            afiseaza_date_demografice(df_filtrat)
+        if elearning_data:
+            afiseaza_date_elearning(df_filtrat)
     else:
         st.warning("Nu există date pentru selecția curentă.")
-
-
