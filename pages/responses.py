@@ -1,3 +1,4 @@
+import csv
 import streamlit as st
 from db_utils import get_connection, close_connection
 import pandas as pd
@@ -6,6 +7,7 @@ import seaborn as sns
 import plotly.express as px
 from country_list import countries_for_language
 from db_utils import show_logged_in_user
+import statsmodels.api as sm
 
 show_logged_in_user()
 
@@ -611,14 +613,11 @@ if st.button("Afișează datele filtrate"):
         selected_reasons,
     )
 
-    # 👉 Salvăm în session_state pentru a păstra datele între rerun-uri
     st.session_state["df_filtrat"] = df_filtrat
 
     if df_filtrat.empty:
         st.warning("Nu există date pentru selecția curentă.")
 
-
-# 🔁 Afișare date deja filtrate (păstrate în sesiune)
 if "df_filtrat" in st.session_state and not st.session_state["df_filtrat"].empty:
     df_filtrat = st.session_state["df_filtrat"]
 
@@ -626,4 +625,124 @@ if "df_filtrat" in st.session_state and not st.session_state["df_filtrat"].empty
         afiseaza_date_demografice(df_filtrat)
     if elearning_data:
         afiseaza_date_elearning_charts(df_filtrat)
+    
+
+def genereaza_insighturi(df):
+    st.subheader("📍 Insight-uri automate")
+    
+    if df.empty:
+        st.info("Nu există date filtrate pentru a genera insight-uri.")
+        return
+
+    try:
+        # GEN
+        gender_counts = df['gender_standard'].dropna().value_counts()
+        if not gender_counts.empty:
+            top_gender = gender_counts.idxmax().capitalize()
+            top_gender_pct = gender_counts.max() / gender_counts.sum() * 100
+            st.markdown(f"👥 **{top_gender}** reprezintă **{top_gender_pct:.1f}%** dintre respondenți.")
+
+        # ȚARĂ
+        country_counts = df['country_standard'].dropna().value_counts()
+        if not country_counts.empty:
+            top_country = country_counts.idxmax().title()
+            top_country_pct = country_counts.max() / country_counts.sum() * 100
+            st.markdown(f"🌍 Cei mai mulți respondenți sunt din **{top_country}** (**{top_country_pct:.1f}%**).")
+
+        # EDUCAȚIE
+        edu_counts = df['educatie_standard'].dropna().value_counts()
+        if not edu_counts.empty:
+            top_edu = edu_counts.idxmax().capitalize()
+            st.markdown(f"🎓 Nivelul de educație predominant este **{top_edu}**.")
+
+        # PLATFORME
+        platforme = df.explode('platform_standard')
+        platform_counts = platforme['platform_standard'].dropna().str.strip().value_counts()
+        if not platform_counts.empty:
+            top_platforms = platform_counts.head(2).index.tolist()
+            st.markdown(f"💻 Platformele cele mai utilizate sunt: **{top_platforms[0]}** și **{top_platforms[1]}**.")
+
+        # CURSURI
+        cursuri = df.explode('course_standard')
+        course_counts = cursuri['course_standard'].dropna().str.strip().value_counts()
+        if not course_counts.empty:
+            top_courses = course_counts.head(2).index.tolist()
+            st.markdown(f"📚 Cele mai frecvente tipuri de cursuri urmate sunt: **{top_courses[0]}** și **{top_courses[1]}**.")
+
+        # MOTIVE
+        motive = df.explode('reasons_standard')
+        reason_counts = motive['reasons_standard'].dropna().str.strip().value_counts()
+        if not reason_counts.empty:
+            top_reasons = reason_counts.head(2).index.tolist()
+            st.markdown(f"🎯 Motivele principale pentru care e-learning este ales sunt: **{top_reasons[0]}** și **{top_reasons[1]}**.")
+    
+    except Exception as e:
+        st.error(f"Eroare la generarea insight-urilor: {e}")
+
+
+col1, col2 = st.columns(2)
+with col1:
+    if st.button("Generează insight-uri"):
+        if "df_filtrat" not in st.session_state or st.session_state["df_filtrat"].empty:
+            st.warning("Nu există date filtrate pentru a genera insight-uri.")
+        else:
+            if "df_filtrat" in st.session_state and not st.session_state["df_filtrat"].empty:
+                genereaza_insighturi(st.session_state["df_filtrat"])
+            else:
+                st.info("Afișează întâi datele filtrate pentru a vedea evoluția notelor.")
+
+
+with col2:
+    if "df_filtrat" in st.session_state and not st.session_state["df_filtrat"].empty:
+        csv_data = st.session_state["df_filtrat"].to_csv(index=False)
+        st.download_button(
+            label="📥 Exportă datele filtrate (CSV)",
+            data=csv_data,
+            file_name='filtered_survey_data.csv',
+            mime='text/csv'
+        )
+    else:
+        st.warning("Nu există date filtrate pentru export.")
+
+
+def grafic_evolutie_note(df):
+    st.subheader("📈 Evoluția notelor înainte și după curs")
+
+    # eliminăm rândurile incomplete
+    df_note = df[['grade_before', 'grade_after', 'learning_method']].dropna()
+
+    if df_note.empty:
+        st.info("Nu există suficiente date pentru a genera graficul.")
+        return
+
+    fig = px.scatter(
+        df_note,
+        x='grade_before',
+        y='grade_after',
+        color='learning_method',
+        trendline='ols',
+        labels={
+            'grade_before': 'Nota înainte de curs',
+            'grade_after': 'Nota după curs',
+            'learning_method': 'Metodă de învățare'
+        },
+        title='Evoluția notelor înainte vs după curs (grupat după metoda de învățare)'
+    )
+
+    fig.update_layout(
+        xaxis_title='Nota înainte de curs',
+        yaxis_title='Nota după curs',
+        xaxis=dict(tickformat='.1f'),
+        yaxis=dict(tickformat='.1f'),
+    )
+
+    st.plotly_chart(fig, use_container_width=True)
+
+
+
+grafic_evolutie_note(df_filtrat)
+
+
+
+
 
