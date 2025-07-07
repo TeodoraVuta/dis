@@ -8,6 +8,10 @@ import plotly.express as px
 from country_list import countries_for_language
 from db_utils import show_logged_in_user
 import statsmodels.api as sm
+import numpy as np
+from wordcloud import WordCloud, STOPWORDS
+import matplotlib.pyplot as plt
+
 
 show_logged_in_user()
 
@@ -217,13 +221,10 @@ def fix_courses(text):
 df['country_standard'] = df['country'].replace(country_standard).str.upper().dropna()
 df['educatie_standard'] = df['education'].replace(educatie_standard).str.upper().dropna()
 df['gender_standard'] = df['gender'].replace(gender_standard).str.upper().dropna()
-
 df['platform_standard'] = df['selected_platforms'].apply(fix_platforms).str.upper().str.split(',').apply(
     lambda lst: [x.strip() for x in lst if x.strip()] if isinstance(lst, list) else [])
-
 df['course_standard'] = df['selected_courses'].apply(fix_courses).str.upper().str.split(',').apply(
     lambda lst: [x.strip() for x in lst if x.strip()] if isinstance(lst, list) else [])
-
 df['reasons_standard'] = df['selected_usage'].replace(reasons_standard).str.upper().str.split(',').apply(
     lambda lst: [x.strip() for x in lst if x.strip()] if isinstance(lst, list) else [])
 
@@ -350,8 +351,6 @@ if not df.empty:
         selected_reasons = ["Toate"]
 
 
-
-
 def afiseaza_date_demografice(filtered_df):
     st.markdown("### 📊 Date demografice")
 
@@ -387,21 +386,16 @@ def stacked_bar_cursuri(df):
     selected_dim = st.selectbox("Alege dimensiunea pentru stacked bar:", dim_options)
     coloana = coloane[selected_dim]
 
-    # ⚙️ Explode cursuri
     df_courses = df.explode('course_standard')
     df_courses = df_courses.dropna(subset=['course_standard', coloana])
     df_courses = df_courses[df_courses['course_standard'] != '']
 
-    # 🧠 Aplică filtrarea pe cursuri înainte de calculul topului
     selected_courses = st.session_state.get("selected_courses", ["Toate"])
     if selected_courses and "Toate" not in selected_courses:
         df_courses = df_courses[df_courses['course_standard'].isin(selected_courses)]
 
-    # 👑 Top 10 cele mai frecvente (în funcție de ce e deja filtrat)
     top_courses = df_courses['course_standard'].value_counts().nlargest(10).index.tolist()
     df_courses = df_courses[df_courses['course_standard'].isin(top_courses)]
-
-    # 🔁 Grupare
     course_counts = df_courses.groupby(['course_standard', coloana]).size().reset_index(name='count')
 
     if course_counts.empty:
@@ -704,43 +698,154 @@ with col2:
     else:
         st.warning("Nu există date filtrate pentru export.")
 
+def boxplot_note(df):
+    st.subheader("📊 Distribuția notelor înainte și după curs (normalizate la 10)")
 
-def grafic_evolutie_note(df):
-    st.subheader("📈 Evoluția notelor înainte și după curs")
+    for col in ['grade_before', 'max_grade_before', 'grade_after', 'max_grade_after']:
+        df[col] = pd.to_numeric(df[col], errors='coerce')
 
-    # eliminăm rândurile incomplete
-    df_note = df[['grade_before', 'grade_after', 'learning_method']].dropna()
+    df = df.dropna(subset=['grade_before', 'max_grade_before', 'grade_after', 'max_grade_after'])
 
-    if df_note.empty:
-        st.info("Nu există suficiente date pentru a genera graficul.")
-        return
+    df['nota_inainte_10'] = (df['grade_before'] / df['max_grade_before'].replace(0, np.nan)) * 10
+    df['nota_dupa_10'] = (df['grade_after'] / df['max_grade_after'].replace(0, np.nan)) * 10
 
-    fig = px.scatter(
-        df_note,
-        x='grade_before',
-        y='grade_after',
-        color='learning_method',
-        trendline='ols',
-        labels={
-            'grade_before': 'Nota înainte de curs',
-            'grade_after': 'Nota după curs',
-            'learning_method': 'Metodă de învățare'
-        },
-        title='Evoluția notelor înainte vs după curs (grupat după metoda de învățare)'
+    df = df[(df['nota_inainte_10'].between(0, 10)) & (df['nota_dupa_10'].between(0, 10))]
+    df_long = pd.melt(
+        df[['nota_inainte_10', 'nota_dupa_10']],
+        var_name='Moment',
+        value_name='Notă'
     )
+    df_long['Moment'] = df_long['Moment'].replace({
+        'nota_inainte_10': 'Înainte de curs',
+        'nota_dupa_10': 'După curs'
+    })
 
-    fig.update_layout(
-        xaxis_title='Nota înainte de curs',
-        yaxis_title='Nota după curs',
-        xaxis=dict(tickformat='.1f'),
-        yaxis=dict(tickformat='.1f'),
+    fig = px.box(
+        df_long,
+        x='Moment',
+        y='Notă',
+        color='Moment',
+        points='all',  # arată și punctele
+        title='Distribuția notelor înainte și după curs',
+        labels={'Notă': 'Notă (din 10)'}
     )
+    fig.update_layout(showlegend=False, yaxis=dict(range=[0, 10]))
 
     st.plotly_chart(fig, use_container_width=True)
 
 
+selected_sex_grade = selected_sex or ["Toate"]
+selected_education_grade = selected_education or ["Toate"]
+selected_country_grade = selected_country or ["Toate"]
+selected_platform_grade = selected_platform or ["Toate"]
+selected_courses_grade = selected_courses or ["Toate"]
+selected_reasons_grade = ["Toate"]
 
-grafic_evolutie_note(df_filtrat)
+st.markdown("---")
+if st.checkbox("📈 Vreau să văd evoluția notelor înainte și după curs (normalizate la 10)"):
+    df_grafic = filtreaza_toate_datele(
+    df,
+    selected_sex_grade, 
+    selected_education_grade, 
+    selected_country_grade,
+    selected_platform_grade, 
+    selected_courses_grade,
+    selected_reasons_grade
+    )
+
+    if not df_grafic.empty:
+        boxplot_note(df_grafic)
+    else:
+        st.info("Nu există suficiente date pentru a genera graficul de evoluție.")
+
+
+
+# def afiseaza_wordcloud_specific_course(df):
+#     st.subheader("🧠 Cuvintele cele mai frecvente în răspunsurile deschise")
+#     text_raw = ' '.join(df['specific_course'].dropna().astype(str).tolist())
+
+#     stopwords = set(STOPWORDS)
+#     stopwords.update([
+#         "și", "sau", "de", "la", "cu", "pentru", "pe", "în", "din", "care",
+#         "a", "este", "fi", "ce", "că", "un", "o", "mai", "nu", "au", "am", "sunt"
+#     ])
+
+#     wordcloud = WordCloud(
+#         width=800,
+#         height=400,
+#         background_color='white',
+#         stopwords=stopwords,
+#         colormap='viridis',
+#         max_words=100,
+#         prefer_horizontal=1.0,
+#         contour_color='black',
+#         contour_width=0.3
+#     ).generate(text_raw)
+
+# fig, ax = plt.subplots(figsize=(10, 5))
+# ax.imshow(wordcloud, interpolation='bilinear')
+# ax.axis('off')
+# st.pyplot(fig)
+
+def grafic_tehnologii_ai_vr(df):
+    st.subheader("🧠 Percepția respondenților față de AI, VR și învățarea imersivă")
+
+    coloane = {
+        "Utilizare VR în educație": "vr_usage",
+        "Interacțiune live cu profesorul": "live_interaction",
+        "Învățare imersivă": "immersive_learning",
+        "Înlocuirea educației clasice": "replacement",
+        "Asistent AI în învățare": "ai_assistant",
+        "Profesor AI în viitor": "ai_professor"
+    }
+
+    df_tech = df[list(coloane.values())].copy()
+    df_tech = df_tech.apply(lambda col: col.str.strip().str.upper())
+
+    data_long = pd.melt(
+        df_tech,
+        var_name='Întrebare',
+        value_name='Răspuns'
+    )
+
+    data_long['Întrebare'] = data_long['Întrebare'].replace({v: k for k, v in coloane.items()})
+    data_long = data_long[data_long['Răspuns'].isin(["DA", "NU"])]  # doar DA / NU
+
+    if data_long.empty:
+        st.info("Nu există suficiente răspunsuri DA/NU pentru a genera graficul.")
+        return
+
+    fig = px.histogram(
+        data_long,
+        x='Întrebare',
+        color='Răspuns',
+        barmode='group',
+        text_auto=True,
+        category_orders={'Întrebare': list(coloane.keys())},
+        labels={"Întrebare": "Întrebări despre AI/VR", "count": "Număr răspunsuri"},
+        title="Răspunsurile respondenților la întrebările despre AI, VR și educația viitorului"
+    )
+
+    fig.update_layout(xaxis_tickangle=25)
+    st.plotly_chart(fig, use_container_width=True)
+
+
+st.markdown("---")
+if st.checkbox("🧠 Vreau să văd percepția respondenților despre AI, VR și învățarea imersivă"):
+    df_grafic = filtreaza_toate_datele(
+    df,
+    selected_sex_grade, 
+    selected_education_grade, 
+    selected_country_grade,
+    selected_platform_grade, 
+    selected_courses_grade,
+    selected_reasons_grade
+    )
+    if not df_grafic.empty:
+        grafic_tehnologii_ai_vr(df_grafic)
+    else:
+        st.info("Nu există suficiente date filtrate pentru acest grafic.")
+
 
 
 
