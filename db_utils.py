@@ -140,16 +140,66 @@ def get_answers_for_question(question_id):
     conn.close()
     return answers
 
-def insert_answer(user_id, question_id, answer_text):
+def insert_question(user_id, topic_id, question_text):
     conn = get_conn()
     cursor = conn.cursor()
     cursor.execute("""
-        INSERT INTO answers (user_id, question_id, answer_text, created_at)
-        VALUES (%s, %s, %s, NOW())
-    """, (user_id, question_id, answer_text))
+        INSERT INTO questions (user_id, topic_id, question_text)
+        VALUES (%s, %s, %s)
+    """, (user_id, topic_id, question_text))
     conn.commit()
     cursor.close()
     conn.close()
+
+
+def get_my_questions_for_topic(topic_id, only_mine=False, user_id=None):
+    conn = get_conn()
+    cursor = conn.cursor()
+    if only_mine and user_id:
+        cursor.execute("""
+            SELECT id, question_text, user_id, is_active 
+            FROM questions 
+            WHERE topic_id = %s AND user_id = %s 
+            ORDER BY id DESC
+        """, (topic_id, user_id))
+    else:
+        cursor.execute("""
+            SELECT id, question_text, user_id, is_active 
+            FROM questions 
+            WHERE topic_id = %s 
+            ORDER BY id DESC
+        """, (topic_id,))
+    questions = cursor.fetchall()
+    cursor.close()
+    conn.close()
+    return questions
+
+def get_answers_for_question(question_id):
+    conn = get_conn()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT a.id, a.answer_text, u.username, a.created_at 
+        FROM answers a
+        JOIN login u ON a.user_id = u.id
+        WHERE a.question_id = %s
+        ORDER BY a.created_at ASC
+    """, (question_id,))
+    answers = cursor.fetchall()
+    cursor.close()
+    conn.close()
+    return answers
+
+
+# def insert_answer(user_id, question_id, answer_text):
+#     conn = get_conn()
+#     cursor = conn.cursor()
+#     cursor.execute("""
+#         INSERT INTO answers (user_id, question_id, answer_text, created_at)
+#         VALUES (%s, %s, %s, NOW())
+#     """, (user_id, question_id, answer_text))
+#     conn.commit()
+#     cursor.close()
+#     conn.close()
 
 def deactivate_question(question_id):
     conn = get_conn()
@@ -194,3 +244,89 @@ def get_feedbacks(limit=5):
     """, (limit,))
     reviews = cursor.fetchall()
     return reviews
+
+
+def insert_notification(user_id, question_id, message):
+    conn = get_conn()
+    cursor = conn.cursor()
+    cursor.execute("""
+        INSERT INTO notifications (user_id, question_id, seen, message)
+        VALUES (%s, %s, FALSE, %s)
+    """, (user_id, question_id, message))
+    conn.commit()
+    cursor.close()
+    conn.close()
+
+def get_unread_notifications(user_id):
+    conn = get_conn()
+    cursor = conn.cursor()
+    cursor.execute("""
+    SELECT id, message, question_id FROM notifications 
+    WHERE user_id = %s AND seen = FALSE
+    ORDER BY id DESC
+""", (user_id,))
+    notifications = cursor.fetchall()
+    cursor.close()
+    conn.close()
+    return notifications
+
+def mark_notifications_as_read(notification_ids):
+    if not notification_ids:
+        return
+    conn = get_conn()
+    cursor = conn.cursor()
+    cursor.execute(
+        "UPDATE notifications SET seen = TRUE WHERE id IN %s",
+        (tuple(notification_ids),)
+    )
+    conn.commit()
+    cursor.close()
+    conn.close()
+
+
+def get_all_topics():
+    conn = get_conn()
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, name FROM topics ORDER BY name")
+    topics = cursor.fetchall()
+    cursor.close()
+    conn.close()
+    return topics
+
+
+
+
+def insert_answer(question_id, user_id, answer_text):
+    conn = get_conn()
+    cursor = conn.cursor()
+    cursor.execute("""
+        INSERT INTO answers (question_id, user_id, answer_text)
+        VALUES (%s, %s, %s)
+    """, (question_id, user_id, answer_text))
+
+    cursor.execute("SELECT user_id FROM questions WHERE id = %s", (question_id,))
+    question_owner = cursor.fetchone()
+    if question_owner and question_owner[0] != user_id:
+        message = f"Ai primit un răspuns nou la întrebarea ta."
+        cursor.execute("""
+            INSERT INTO notifications (user_id, question_id, message, seen)
+            VALUES (%s, %s, %s, FALSE)
+        """, (question_owner[0], question_id, message))
+
+    conn.commit()
+    cursor.close()
+    conn.close()
+
+def mark_notifications_as_read(notification_ids):
+    if not notification_ids:
+        return
+    conn = get_conn()
+    cursor = conn.cursor()
+    
+    format_strings = ','.join(['%s'] * len(notification_ids))
+    query = f"UPDATE notifications SET seen = TRUE WHERE id IN ({format_strings})"
+    cursor.execute(query, tuple(notification_ids))
+    
+    conn.commit()
+    cursor.close()
+    conn.close()

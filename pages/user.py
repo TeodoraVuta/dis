@@ -1,6 +1,7 @@
 import streamlit as st
-from db_utils import show_logged_in_user, get_user_id_by_username, get_conn, get_or_create_topic
+from db_utils import show_logged_in_user, get_all_topics, get_conn, insert_question, get_my_questions_for_topic, get_answers_for_question, get_user_id_by_username, get_or_create_topic, get_unread_notifications, mark_notifications_as_read, insert_answer, insert_notification
 import pandas as pd
+from datetime import datetime
 
 show_logged_in_user()
 
@@ -8,66 +9,6 @@ if "page" not in st.session_state:
     st.session_state.page = "select_topic"
 
 username = st.session_state.get("username", None)
-
-def get_all_topics():
-    conn = get_conn()
-    cursor = conn.cursor()
-    cursor.execute("SELECT id, name FROM topics ORDER BY name")
-    topics = cursor.fetchall()
-    cursor.close()
-    conn.close()
-    return topics
-
-def insert_question(user_id, topic_id, question_text):
-    conn = get_conn()
-    cursor = conn.cursor()
-    cursor.execute("""
-        INSERT INTO questions (user_id, topic_id, question_text)
-        VALUES (%s, %s, %s)
-    """, (user_id, topic_id, question_text))
-    conn.commit()
-    cursor.close()
-    conn.close()
-
-def get_questions_for_topic(topic_id):
-    conn = get_conn()
-    cursor = conn.cursor()
-    cursor.execute("""
-        SELECT id, question_text, user_id, is_active 
-        FROM questions 
-        WHERE topic_id = %s 
-        ORDER BY id DESC
-    """, (topic_id,))
-    questions = cursor.fetchall()
-    cursor.close()
-    conn.close()
-    return questions
-
-def get_answers_for_question(question_id):
-    conn = get_conn()
-    cursor = conn.cursor()
-    cursor.execute("""
-        SELECT a.answer_text, u.username, a.created_at 
-        FROM answers a
-        JOIN login u ON a.user_id = u.id
-        WHERE a.question_id = %s
-        ORDER BY a.created_at ASC
-    """, (question_id,))
-    answers = cursor.fetchall()
-    cursor.close()
-    conn.close()
-    return answers
-
-def insert_answer(question_id, user_id, answer_text, created_at):
-    conn = get_conn()
-    cursor = conn.cursor()
-    cursor.execute("""
-        INSERT INTO answers (question_id, user_id, answer_text, created_at)
-        VALUES (%s, %s, %s, NOW())
-    """, (question_id, user_id, answer_text, created_at))
-    conn.commit()
-    cursor.close()
-    conn.close()
 
 def deactivate_question(question_id):
     conn = get_conn()
@@ -105,14 +46,24 @@ def create_feedback():
         else:
             st.warning("Te rugăm să completezi feedback-ul înainte de a trimite.")
 
-# Verifică dacă utilizatorul e logat
+# --- App Logic ---
 if not username:
     st.warning("⚠️ Nu ești conectat. Click aici pentru a te conecta: [Conectare](./app)")
     st.stop()
 
+
 user_id = get_user_id_by_username(username)
 
-# Pagina de selectare subiect
+notifications = get_unread_notifications(user_id)
+if notifications:
+    with st.expander(f"🔔 Ai {len(notifications)} notificări necitite"):
+        for notif_id, message, question_id in notifications:
+            st.markdown(f"📩 {message} – [Vezi întrebarea](#{question_id})")  
+        if st.button("✅ Marchează toate ca citite"):
+            notification_ids = [n[0] for n in notifications]
+            mark_notifications_as_read(notification_ids)
+            st.rerun()
+
 if st.session_state.page == "select_topic":
     st.title("📌 Pune o întrebare")
     st.markdown("### 🔍 Alege un subiect:")
@@ -143,30 +94,28 @@ if st.session_state.page == "select_topic":
             topic_id = get_or_create_topic(new_topic.strip())
             st.success(f"✅ Subiectul „{new_topic}” a fost adăugat!")
             st.rerun()
-    
+
     create_feedback()
 
-
-    
-
-# Pagina întrebărilor pentru un subiect
 elif st.session_state.page == "topic_questions":
     selected_topic_id = st.session_state.selected_topic_id
     selected_topic_name = st.session_state.selected_topic_name
 
     st.title(f"📋 Întrebări pentru subiectul: {selected_topic_name}")
 
-    questions = get_questions_for_topic(selected_topic_id)
+    show_mine = st.checkbox("🔎 Afișează doar întrebările mele")
+    questions = get_my_questions_for_topic(selected_topic_id, only_mine=show_mine, user_id=user_id)
+
     if questions:
         for i, (question_id, q_text, q_user_id, is_active) in enumerate(questions):
             st.markdown(f"#### ❓ Întrebarea {i+1}: {q_text}")
-            
+
             if not is_active:
                 st.warning("🔒 Această întrebare a fost dezactivată de autor. Nu se mai pot adăuga răspunsuri.")
 
             answers = get_answers_for_question(question_id)
             if answers:
-                for ans_text, ans_user, ans_time in answers:
+                for ans_id, ans_text, ans_user, ans_time in answers:
                     st.markdown(f"🗨️ **{ans_user}** ({ans_time.strftime('%Y-%m-%d %H:%M')}): {ans_text}")
             else:
                 st.markdown("ℹ️ Nu există răspunsuri încă.")
@@ -179,9 +128,15 @@ elif st.session_state.page == "topic_questions":
                         if not user_answer.strip():
                             st.warning("⚠️ Nu poți trimite un răspuns gol.")
                         else:
-                            insert_answer(user_id, question_id, user_answer.strip())
+                            insert_answer(question_id, user_id, user_answer.strip())
                             st.success("✅ Răspunsul tău a fost trimis.")
-                            st.rerun()
+                            if q_user_id != user_id:
+                                insert_notification(
+                                    q_user_id,
+                                    question_id,
+                                    message="Ai primit un răspuns nou la întrebarea ta."
+                                )
+                                st.rerun()
 
             if user_id == q_user_id and is_active:
                 if st.button("🔒 Dezactivează întrebarea", key=f"deactivate_{question_id}"):
@@ -209,4 +164,3 @@ elif st.session_state.page == "topic_questions":
         st.rerun()
 
     create_feedback()
-
