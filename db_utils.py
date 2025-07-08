@@ -294,8 +294,6 @@ def get_all_topics():
     return topics
 
 
-
-
 def insert_answer(question_id, user_id, answer_text):
     conn = get_conn()
     cursor = conn.cursor()
@@ -307,7 +305,7 @@ def insert_answer(question_id, user_id, answer_text):
     cursor.execute("SELECT user_id FROM questions WHERE id = %s", (question_id,))
     question_owner = cursor.fetchone()
     if question_owner and question_owner[0] != user_id:
-        message = f"Ai primit un răspuns nou la întrebarea ta."
+        message = f"Ai primit un raspuns nou la întrebarea ta."
         cursor.execute("""
             INSERT INTO notifications (user_id, question_id, message, seen)
             VALUES (%s, %s, %s, FALSE)

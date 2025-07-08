@@ -262,24 +262,34 @@ with st.expander("Cont nou - Înregistrează-te aici"):
                         database=db_user,
                         port=db_port,
                     )
-                    cursor = conn.cursor()
+                    # cursor = conn.cursor()
+                    cursor = conn.cursor(buffered=True)
 
                     cursor.execute("SELECT * FROM login WHERE username = %s", (username,))
                     if cursor.fetchone():
-                        st.error("Acest nume de utilizator este deja folosit. Alege altul.")
+                        st.error("Acest nume de utilizator este deja folosit. Te rog alege altul.")
+                        st.stop()
+                    
                     cursor.execute("SELECT * FROM login WHERE email = %s", (email,))
                     if cursor.fetchone():
                         st.error("Acest email este deja folosit. Te rog folosește altul.")
-                    else:
-                        hashed_password = hash_password(password)
-                        cursor.execute("INSERT INTO login (email, username, password) VALUES (%s, %s, %s)", (email, username, hashed_password))
-                        conn.commit()
+                        st.stop()
+                    
+                    # Dacă a trecut de ambele verificări, creează contul
+                    hashed_password = hash_password(password)
+                    cursor.execute(
+                        "INSERT INTO login (email, username, password) VALUES (%s, %s, %s)",
+                        (email, username, hashed_password)
+                    )
+                    conn.commit()
+                    st.success(f"Cont creat cu succes pentru utilizatorul '{username}'!")
+                    
+
                 except mysql.connector.Error as err:
                     st.error(f"Eroare la crearea contului: {err}")
                 finally:
                     cursor.close()
                     conn.close()
-                st.success(f"Cont creat cu succes pentru utilizatorul '{username}'!")
 
 reviews = get_feedbacks()
 
@@ -288,13 +298,10 @@ if not reviews:
     st.stop()
 
 st.subheader("📋 Cele mai recente feeback uri")
-
-# Create 5 columns
 cols = st.columns(5)
 
 for col, (username, text) in zip(cols * 2, [tuple(r) for r in reviews]):
     with col:
-        # Create avatar + name row
         with st.container():
             avatar_col, name_col = st.columns([1, 3])
             with avatar_col:

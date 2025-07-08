@@ -54,15 +54,38 @@ if not username:
 
 user_id = get_user_id_by_username(username)
 
+# notifications = get_unread_notifications(user_id)
+# if notifications:
+#     with st.expander(f"🔔 Ai {len(notifications)} notificări necitite"):
+#         for notif_id, message, question_id in notifications:
+#             st.markdown(f"📩 {message} – [Vezi întrebarea](#{question_id})")  
+#             if st.button(f"📩 {message} – Vezi întrebarea", key=f"notif_{notif_id}"):
+#                 st.session_state.selected_question_id = question_id
+#                 st.session_state.page = "topic_questions"
+#                 st.rerun()
+#         st.markdown("---")
+#         st.markdown("### Acțiuni:")
+#         if st.button("✅ Marchează toate ca citite"):
+#             notification_ids = [n[0] for n in notifications]
+#             mark_notifications_as_read(notification_ids)
+#             st.rerun()
+
+
 notifications = get_unread_notifications(user_id)
+
 if notifications:
     with st.expander(f"🔔 Ai {len(notifications)} notificări necitite"):
         for notif_id, message, question_id in notifications:
-            st.markdown(f"📩 {message} – [Vezi întrebarea](#{question_id})")  
+            if st.button(f"📩 {message} – Vezi subiectul", key=f"notif_{notif_id}"):
+                st.session_state.selected_question_id = question_id
+                st.session_state.page = "topic_questions"
+                st.rerun()
+
         if st.button("✅ Marchează toate ca citite"):
             notification_ids = [n[0] for n in notifications]
             mark_notifications_as_read(notification_ids)
             st.rerun()
+
 
 if st.session_state.page == "select_topic":
     st.title("📌 Pune o întrebare")
@@ -134,7 +157,7 @@ elif st.session_state.page == "topic_questions":
                                 insert_notification(
                                     q_user_id,
                                     question_id,
-                                    message="Ai primit un răspuns nou la întrebarea ta."
+                                    message="Ai primit un raspuns nou la întrebarea ta."
                                 )
                                 st.rerun()
 

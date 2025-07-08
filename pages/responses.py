@@ -699,7 +699,7 @@ with col2:
         st.warning("Nu există date filtrate pentru export.")
 
 def boxplot_note(df):
-    st.subheader("📊 Distribuția notelor înainte și după curs (normalizate la 10)")
+    st.subheader("📊 Au note mai mari elevii care au urmat cursuri online?")
 
     for col in ['grade_before', 'max_grade_before', 'grade_after', 'max_grade_after']:
         df[col] = pd.to_numeric(df[col], errors='coerce')
@@ -742,7 +742,7 @@ selected_courses_grade = selected_courses or ["Toate"]
 selected_reasons_grade = ["Toate"]
 
 st.markdown("---")
-if st.checkbox("📈 Vreau să văd evoluția notelor înainte și după curs (normalizate la 10)"):
+if st.checkbox("📈 Vreau să văd evoluția notelor înainte și după folosirea e-learning ului"):
     df_grafic = filtreaza_toate_datele(
     df,
     selected_sex_grade, 
