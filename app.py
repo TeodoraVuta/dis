@@ -12,7 +12,7 @@ from db_utils import show_logged_in_user, get_conn, get_feedbacks
 
 show_logged_in_user()
 
-load_dotenv()
+# load_dotenv()
 
 db_host = st.secrets["DB_HOST"]
 db_user = st.secrets["DB_USER"]

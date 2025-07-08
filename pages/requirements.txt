@@ -4,4 +4,3 @@ mysql-connector-python
 python-dotenv
 country_list
 yfinance
-dotenv
